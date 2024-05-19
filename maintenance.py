@@ -1,8 +1,51 @@
 import customtkinter as ctk
 from datetime import datetime
+import sqlite3
 ctk.set_default_color_theme('green')
 ctk.set_appearance_mode('dark')
 
+
+class Baza_danych():
+    def __init__(self,db_name):
+        self.con=sqlite3.connect(db_name)
+        self.cur= self.con.cursor()
+
+    def Create(self,table_name,columns):
+        columns_with_types = ", ".join([f"{col} {dtype}" for col, dtype in columns.items()])
+        create_table_query = f'CREATE TABLE IF NOT EXISTS {table_name} ({columns_with_types})'
+        self.cur.execute(create_table_query)
+        self.con.commit()
+
+    def Delete(self,table_name,condition ):
+        delete_query =f"Delete from {table_name} where {condition}"
+        self.cur.execute(delete_query)
+        self.con.commit()
+
+    def Drop (self,table_name):
+        drop_table_query =f'drop table if exists {table_name}'
+        self.cur.execute(drop_table_query)
+        self.con.commit()
+    
+    def Insert(self,table_name, data):
+        columns = ", ".join(data.keys())
+        placeholders = ", ".join(["?" for _ in data.values()])
+        values = tuple(data.values())
+        insert_query =f'insert into {table_name} ({columns}) values ({placeholders})'
+        self.cur.execute(insert_query,values)
+        self.con.commit()
+
+    def Select(self,table):
+        select_query = f'Select *from {table}'
+        # self.cur.execute(select_query)
+        for i in self.cur.execute(select_query):
+            print (i)
+
+    def Select_with_codnition(self,table,codnition):
+        select_query = f'Select *from {table} where {codnition}'
+        # self.cur.execute(select_query)
+        for i in self.cur.execute(select_query):
+            print (i)
+    
 
 
 class Apk (ctk.CTk):
@@ -43,10 +86,11 @@ class Apk (ctk.CTk):
 
 
 
+b=Baza_danych("mainenance_db")
 
+# b.Select('CH04')
 
-
-
-app=Apk()
-
-app.mainloop()
+current_time= datetime.now()
+time=current_time.strftime(("%Y-%m-%d %H:%M:%S"))
+# b.Insert("CH04",{'id':3,'data_zdarzenia':time,'pracownik':6501,'zdarzenie': 'urwało narzędzie'})
+# b.Select_with_codnition('Ch04','pracownik =6500')
