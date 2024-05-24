@@ -2,8 +2,8 @@ from tkinter import messagebox
 import customtkinter as ctk
 from datetime import datetime
 import sqlite3
-from tkinter import StringVar
-import re
+import tkinter as tk
+from xlsxwriter.workbook import Workbook
 
 ctk.set_default_color_theme('green')
 ctk.set_appearance_mode('dark')
@@ -11,57 +11,13 @@ currenttime=datetime.now()
 time=currenttime.strftime('%Y-%m-%d %H:%M:%S')
 
 
-class Baza_danych():
-    def __init__(self,db_name):
-        self.con=sqlite3.connect(db_name)
-        self.cur= self.con.cursor()
-
-    def Create(self,table_name,columns):
-        columns_with_types = ", ".join([f"{col} {dtype}" for col, dtype in columns.items()])
-        create_table_query = f'CREATE TABLE IF NOT EXISTS {table_name} ({columns_with_types})'
-        print(create_table_query)
-        self.cur.execute(create_table_query)
-        self.con.commit()
-        
-
-    def Delete(self,table_name,condition ):
-        delete_query =f"Delete from {table_name} where {condition}"
-        self.cur.execute(delete_query)
-        self.con.commit()
-
-    def Drop (self,table_name):
-        drop_table_query =f'drop table if exists {table_name}'
-        self.cur.execute(drop_table_query)
-        self.con.commit()
-    
-    
-    def Insert(self,table_name, data):
-        columns = ", ".join(data.keys())
-        placeholders = ", ".join(["?" for _ in data.values()])
-        values = tuple(data.values())
-        insert_query =f'insert into {table_name} ({columns}) values ({placeholders})'
-        self.cur.execute(insert_query,values)
-        self.con.commit()
-
-    def Select(self,table):
-        select_query = f'Select *from {table}'
-        # self.cur.execute(select_query)
-        for i in self.cur.execute(select_query):
-            print (i)
-
-    def Select_with_codnition(self,table,codnition):
-        select_query = f'Select *from {table} where {codnition}'
-        # self.cur.execute(select_query)
-        for i in self.cur.execute(select_query):
-            print (i)
-    
-
-
 class Apk (ctk.CTk):
     def __init__(self):
         super().__init__()
         self.geometry('750x400')
-        self.title ('maintennace and failure system')
+        self.title ('maintenace system')
+        self.menubar = tk.Menu()
+        self.config(menu=self.menubar)
 
         self.machine_number_var = ctk.StringVar()
         self.personal_number_var = ctk.StringVar()
@@ -92,65 +48,107 @@ class Apk (ctk.CTk):
         self.machine_number_var.trace_add("write", self.to_uppercase)
         self.personal_number_var.trace_add("write", self.to_uppercase)
         self.reason_var.trace_add("write", self.to_uppercase)
-    
+
+        file_menu = tk.Menu(self.menubar, tearoff=0)
+        file_menu.add_command(label="Załóż Bazę",command=self.Create)
+        file_menu.add_command(label="Wyczyść Bazę",command=self.Drop),
+        file_menu.add_command(label="Importuj Bazę",command=self.To_excel)
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit",command=exit)
+
+        view_menu = tk.Menu(self.menubar, tearoff=0)
+        view_menu.add_command(label="Szybki Podgląd",command=self.display_database)
+
+        self.menubar.add_cascade(label="Baza Danych", menu=view_menu)   
+        self.menubar.add_cascade(label="System", menu=file_menu) 
+
+
     def to_uppercase(self, *args):
         self.machine_number_var.set(self.machine_number.get().upper())
         self.personal_number_var.set(self.personal_number.get().upper())
-        self.reason_var.set(self.reason.get().upper())
+        self.reason_var.set(self.reason.get().upper()
+        )
 
+    def Create(self):
+        con=sqlite3.connect("maintenance_db")
+        cur= con.cursor()
+        cur.execute('create table if not exists maszyny (id integer primary key autoincrement, data_akcji not null, maszyna not null, operator not null, awaria not null)')
+        messagebox.showinfo('Informacja Systemowa', 'Baza Danych Została Stworzona')
+        con.commit()
+    
+
+    def Drop(self):
+        con=sqlite3.connect("maintenance_db")
+        cur= con.cursor()
+        cur.execute('drop table maszyny')
+        messagebox.showinfo('Informacja Systemowa', 'Baza Danych Została Usunięta')
+        con.commit()
+
+
+    def To_excel(*args):
+        workbook = Workbook('Failure_file.xlsx')
+        worksheet = workbook.add_worksheet('Awarie')
+        con=sqlite3.connect("maintenance_db")
+        cur = con
+        mysel = cur.execute("select * from maszyny")
+        for i, row in enumerate(mysel):
+            for j, value in enumerate(row):
+                worksheet.write(i, j, row[j])
+        messagebox.showinfo('Informacja Systemowa', 'Baza Danych Została Zaimportowana')
+        workbook.close()
+    
 
     def Zgłoś(self):
         con=sqlite3.connect("maintenance_db")
         cur= con.cursor()
-        # cur.execute('insert into CH04(data_akcji,maszyna,operator,awaria) values(:data,:maszyna,:operator,:usterka)',
-        #         {
-        #             'data': time ,
-        #             'maszyna': self.machine_number.get(),
-        #             'operator': self.personal_number.get(),
-        #             'usterka': self.reason.get()
-                # })
-        table_name = self.machine_number_var.get()
+        cur.execute('insert into maszyny(data_akcji,maszyna,operator,awaria) values(:data,:maszyna,:operator,:usterka)',
+                {
+                    'data': time ,
+                    'maszyna': self.machine_number.get(),
+                    'operator': self.personal_number.get(),
+                    'usterka': self.reason.get()
+                })
+        con.commit()
+        messagebox.showinfo('Wiadomość Systemow','Adnotacja Została Dodana') 
+        self.machine_number.delete(0,'end'),
+        self.personal_number.delete(0,'end'),
+        self.reason.delete(0,'end')
         
-        if  re.match("^[A-Za-z0-9_]+$", table_name):
-            query = f'INSERT INTO {table_name} (data_akcji, maszyna, operator, awaria) VALUES (:data, :maszyna, :operator, :usterka)'
-            params = {
-                'data': time,
-                'maszyna': self.machine_number_var.get(),
-                'operator': self.personal_number_var.get(),
-                'usterka': self.reason_var.get()
-            }
-            print(query, params)
-            con.commit()
-
-        # self.machine_number.delete(0,'end'),
-        # self.personal_number.delete(0,'end'),
-        # self.reason.delete(0,'end')
-        
-
-
-
-
-b=Baza_danych("maintenance_db")
-
-
-
-# b.Create('CH04',{'id': 'integer primary key autoincrement',
-#                 'data_akcji': 'not null',
-#                 'maszyna':'not null',
-#                 'operator':'not null',
-#                 'awaria':'not null'})
+    def display_database(*args):
+        con=sqlite3.connect("maintenance_db")
+        cur = con
+        results = cur.execute('select * from maszyny')
+        w = results.fetchall()
+        if len(w) > 0:
+            window = tk.Tk()
+            window.title('Baza Danych Awari')
+            window.geometry('1050x800')
+            window.configure(background='#b3b3b3')
+            columns = ('c1', 'c2', 'c3', 'c4', 'c5')
+            tree = tk.ttk.Treeview(window, columns=columns, show='headings', height=52)
+            tree.heading('c1', text='Id')
+            tree.heading('c2', text='Data')
+            tree.heading('c3', text='Maszyna')
+            tree.heading('c4', text='Operator')
+            tree.heading('c5', text='Usterka')
+            for row in cur.execute('select id,data_akcji,maszyna,operator,awaria from maszyny'):
+                tree.insert('', tk.END, values=(row[0], row[1], row[2], row[3], row[4]))
+                tree.grid(row=0, column=0, sticky='n')
+                scrollbar = tk.Scrollbar(window, orient=tk.VERTICAL, command=tree.yview)
+                tree.configure(yscroll=scrollbar.set)
+                scrollbar.grid(row=0, column=1, sticky='ns')
+                con.commit()
+        else:
+            messagebox.showinfo('Informacja Systemowa', 'Baza Danych Jest Pusta')
 
 
-
-# b.Insert ('CH04',{'data_akcji': time,
-#                 'maszyna':'CH04',
-#                 'operator':'6500',
-#                 'awaria':'awaria'})
 
 con=sqlite3.connect('maintenance_db')
 cur=con
-for i in cur.execute('select * from CH04'):
-    print (i)
+# for i in cur.execute('select * from maszyny'):
+    #  print (i)
+
+
 
 
 ap=Apk()
